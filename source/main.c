@@ -1,14 +1,19 @@
-#include <stdlib.h>
+#include "helper.h"
 #include <stdio.h>
-#include <io.h>
-#include <png.h>
-#include <GL/freeglut.h>
+#include <GL/gl.h>
+#include <GL/glu.h>
+#include <GL/glfw3.h>
 
-typedef unsigned char byte, uchar;
-typedef unsigned short ushort;
-typedef unsigned int uint;
 
-extern void drawTriangle(const float vs[3][3], const float vns[3][3], const float vts[3][2]);
+void drawTriangle(const float vs[3][3], const float vns[3][3], const float vts[3][2]) {
+	glBegin(GL_TRIANGLE_STRIP);
+	for (int i = 0; i < 3; i++) {
+		glNormal3fv(vns[i]);
+		glTexCoord2f(vts[i][0], 1.0 - vts[i][1]);
+		glVertex3fv(vs[i]);
+	}
+	glEnd();
+}
 
 const float ambientLight[] = {0.2, 0.2, 0.2, 1.0};
 const float directedLight[] = {0.8, 0.8, 0.8, 1.0};
@@ -43,32 +48,29 @@ typedef struct {
 model *currentModel;
 
 texture_model *loadTextureImage(const char *fn, texture_model *tex) {
-	FILE *fp = fopen(fn, "rb");
-	if (fp == NULL)
+	GDIPImage *himg = imageLoadFile(fn);
+	if (himg == NULL)
 		return NULL;
-	if (tex == NULL)
-		tex = malloc(sizeof(texture_model));
-	png_struct *ps = png_create_read_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
-	png_info *pi = png_create_info_struct(ps);
-	png_init_io(ps, fp);
-	png_read_png(ps, pi,
-		PNG_TRANSFORM_EXPAND | PNG_TRANSFORM_PACKING | PNG_TRANSFORM_STRIP_16 | PNG_TRANSFORM_STRIP_ALPHA, NULL);
-	fclose(fp);
+	texture_model *ntex = (tex != NULL) ? tex : malloc(sizeof(texture_model));
+	if (ntex == NULL)
+		goto err;
 	uint w, h;
-	png_get_IHDR(ps, pi, &w, &h, NULL, NULL, NULL, NULL, NULL);
+	if (!imageGetSize(himg, &w, &h))
+		goto err;
 	tex->width = w;
 	tex->height = h;
-	tex->pixels = malloc(3 * w * h);
-	byte (**pxss)[3] = (byte(**)[3])png_get_rows(ps, pi);
-	for (uint i = 0; i < h; i++) {
-		memcpy((byte(*)[3])&tex->pixels[w * i], pxss[i], 3 * w);
-	}
-	png_destroy_read_struct(&ps, &pi, NULL);
-	return tex;
+	tex->pixels = imageGetPixels(himg, NULL);
+	if (tex->pixels == NULL)
+		goto err;
+	return ntex;
+err:	imageDispose(himg);
+	if (tex == NULL && ntex != NULL)
+		free(ntex);
+	return NULL;
 }
 
 model *loadModel(const char *fn, model *mod) {
-	FILE *fp = fopen(fn, "rb");
+	FILE *fp = ufopen(fn, "rb");
 	if (fp == NULL)
 		return NULL;
 	if (mod == NULL)
@@ -79,8 +81,10 @@ model *loadModel(const char *fn, model *mod) {
 		ushort componentCount;
 	} buf;
 	fread(&buf, sizeof(buf), 1, fp);
-	if (buf.header != 0x4A424FFF)
+	if (buf.header != 0x4A424FFF) {
+		fclose(fp);
 		return NULL;
+	}
 	mod->textureCount = buf.textureCount;
 	mod->textures = malloc(sizeof(texture_model) * buf.textureCount);
 	for (ushort i = 0; i < buf.textureCount; i++) {
@@ -118,6 +122,16 @@ model *loadModel(const char *fn, model *mod) {
 		vi.textureBinds = malloc(sizeof(float[2]) * buf.counts[2]);
 		fread(vi.textureBinds, sizeof(float[2]), buf.counts[2], fp);
 		fread(&buf.counts, sizeof(ushort[3]), 1, fp);
+		//TODO
+		for (ushort j = 0; j < buf.counts[0]; j++) {
+			ushort i;
+			fread(&i, sizeof(ushort), 1, fp);
+		}
+		//TODO
+		for (ushort j = 0; j < buf.counts[1]; j++) {
+			ushort is[2];
+			fread(is, sizeof(ushort[2]), 1, fp);
+		}
 		comp->triangleCount = buf.counts[2];
 		comp->triangles = malloc(sizeof(triangle_model) * buf.counts[2]);
 		for (ushort j = 0; j < buf.counts[2]; j++) {
@@ -143,15 +157,43 @@ void initTexture(texture_model *tex) {
 	glBindTexture(GL_TEXTURE_2D, tex->id);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, tex->width, tex->height, 0, GL_RGB, GL_UNSIGNED_BYTE, tex->pixels);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, tex->width, tex->height, 0, GL_BGR_EXT, GL_UNSIGNED_BYTE, tex->pixels);
 	free((byte(*)[3])tex->pixels);
 	tex->pixels = NULL;
 //	glDeleteTextures(1, &id);
 }
 
-void init(uint argcnt, const char **args) {
-	chdir(argcnt == 2 ? args[1] : "model/");
+void initData(uint argcnt, char **args) {
+	if (!imageInit()) {
+		messageBox("GDI+ error.", NULL, MESSAGE_ERROR);
+		abort();
+	}
+	uchdir(argcnt == 2 ? args[1] : "model/");
 	currentModel = loadModel("model.dat", NULL);
+	imageTerminate();
+}
+
+GLFWwindow *initGLFW(void) {
+	int i, j;
+	glfwGetVersion(&i, &j, NULL);
+	if (i < 3 || j < 1) {
+		messageBox("GLFW version too low.", NULL, MESSAGE_ERROR | MESSAGE_MODAL);
+		abort();
+	}
+	if (!glfwInit())
+		abort();
+	glfwWindowHint(GLFW_CLIENT_API, GLFW_OPENGL_API);
+	glfwWindowHint(GLFW_DOUBLEBUFFER, true);
+	glfwWindowHint(GLFW_SRGB_CAPABLE, true);
+	GLFWwindow *wnd = glfwCreateWindow(640, 480, "Tiny Model Viewer", NULL, NULL);
+	if (wnd == NULL) {
+		messageBox("Context error.", NULL, MESSAGE_ERROR | MESSAGE_MODAL);
+		abort();
+	}
+	return wnd;
+}
+
+void initGraphics(void) {
 	glEnable(GL_DEPTH_TEST);
 	glEnable(GL_LIGHTING);
 	glClearColor(ambientLight[0], ambientLight[1], ambientLight[2], ambientLight[3]);
@@ -164,7 +206,7 @@ void init(uint argcnt, const char **args) {
 	}
 }
 
-void reshape(int w, int h) {
+void resize(GLFWwindow *wnd, int w, int h) {
 	int min = (w <= h) ? w : h;
 	double dx = 0.1 / 2 * w / min, dy = 0.1 / 2 * h / min;
 	glViewport(0, 0, w, h);
@@ -173,7 +215,7 @@ void reshape(int w, int h) {
 	glFrustum(-dx, dx, -dy, dy, 0.075, 1000.0);
 }
 
-void display(void) {
+void display(GLFWwindow *wnd) {
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
@@ -195,17 +237,22 @@ void display(void) {
 		}
 	}
 	glFlush();
-	glutSwapBuffers();
+	glfwSwapBuffers(wnd);
 }
 
-int main(int argcnt, char **args) {
-	glutInit(&argcnt, args);
-	glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH);
-	glutInitWindowSize(600, 600);
-	glutCreateWindow("RenderModel");
-	init(argcnt, (const char**)args);
-	glutReshapeFunc(&reshape);
-	glutDisplayFunc(&display);
-	glutMainLoop();
-	return 0;
+void start(void) {
+	char **args;
+	uint argcnt = initProcess(&args);
+	initData(argcnt, args);
+	GLFWwindow* wnd = initGLFW();
+	glfwMakeContextCurrent(wnd);
+	initGraphics();
+	glfwSetFramebufferSizeCallback(wnd, &resize);
+	glfwSetWindowRefreshCallback(wnd, &display);
+	while (!glfwWindowShouldClose(wnd)) {
+		glfwWaitEvents();
+	}
+	glfwDestroyWindow(wnd);
+	glfwTerminate();
+	exit(0);
 }
