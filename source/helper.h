@@ -23,6 +23,18 @@ extern char *stringConvertMultiS(const wchar *wstr);
 extern uint stringACPConvertMultiBuffer(const char *str, int s, char **bufp);
 extern char *stringACPConvertMultiBufferS(const char *str);
 
+typedef void VGLHWindow;
+
+#define ALIGN_TOP 0
+#define ALIGN_BOTTOM 8
+#define ALIGN_LEFT 0
+#define ALIGN_CENTER 6
+#define ALIGN_RIGHT 2
+
+extern bool vglhGetViewport(int *lp, int *tp, int *rp, int *bp);
+extern bool vglhTextConfig(VGLHWindow *hwnd, uint aln, uint clr);
+extern bool vglhDrawText(VGLHWindow *hwnd, const char *txt, uint x, uint y);
+
 typedef void GDIPImage;
 
 extern bool imageInit(void);
@@ -40,6 +52,8 @@ typedef void IOFile;
 #define MESSAGE_MODAL 0x12000
 
 extern uint initProcess(char ***argsp);
+extern void *zalloc(uint s);
+extern void vfree(void **ps, uint cnt);
 extern bool uchdir(const char *fp);
 extern IOFile *ufopen(const char *fn, const char *m);
 extern void messageBox(const char *tt, const char *txt, uint typ);

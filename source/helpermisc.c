@@ -28,6 +28,20 @@ uint initProcess(char ***argsp) {
 	return cnt;
 }
 
+void *zalloc(uint s) {
+	void *p = malloc(s);
+	if (p == NULL)
+		return NULL;
+	return memset(p, 0, s);
+}
+
+void vfree(void **ps, uint cnt) {
+	for (uint i = 0; i < cnt; i++) {
+		free(ps[i]);
+	}
+	free(ps);
+}
+
 bool uchdir(const char *fp) {
 	return SetCurrentDirectoryW(stringConvertWideBufferS(fp));
 }

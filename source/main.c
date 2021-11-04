@@ -1,9 +1,13 @@
 #include "helper.h"
 #include <stdio.h>
 #include <GL/gl.h>
+#include <GL/glext.h>
 #include <GL/glu.h>
 #include <GL/glfw3.h>
 
+// Replace native to avoid including Windows header
+extern VGLHWindow *glfwGetWin32Window(GLFWwindow* wnd);
+extern void *glfwGetWGLContext(GLFWwindow* wnd);
 
 void drawTriangle(const float vs[3][3], const float vns[3][3], const float vts[3][2]) {
 	glBegin(GL_TRIANGLE_STRIP);
@@ -184,6 +188,7 @@ GLFWwindow *initGLFW(void) {
 		abort();
 	glfwWindowHint(GLFW_CLIENT_API, GLFW_OPENGL_API);
 	glfwWindowHint(GLFW_DOUBLEBUFFER, true);
+	glfwWindowHint(GLFW_SAMPLES, 4);
 	glfwWindowHint(GLFW_SRGB_CAPABLE, true);
 	GLFWwindow *wnd = glfwCreateWindow(640, 480, "Tiny Model Viewer", NULL, NULL);
 	if (wnd == NULL) {
@@ -195,11 +200,13 @@ GLFWwindow *initGLFW(void) {
 
 void initGraphics(void) {
 	glEnable(GL_DEPTH_TEST);
+	glEnable(GL_MULTISAMPLE);
 	glEnable(GL_LIGHTING);
 	glClearColor(ambientLight[0], ambientLight[1], ambientLight[2], ambientLight[3]);
 	glLightModelfv(GL_LIGHT_MODEL_AMBIENT, ambientLight);
 	glEnable(GL_COLOR_MATERIAL);
 	glShadeModel(GL_SMOOTH);
+	glEnable(GL_RESCALE_NORMAL);
 	glEnable(GL_TEXTURE_2D);
 	for (ushort i = 0; i < currentModel->textureCount; i++) {
 		initTexture(&currentModel->textures[i]);
@@ -238,12 +245,30 @@ void display(GLFWwindow *wnd) {
 	}
 	glFlush();
 	glfwSwapBuffers(wnd);
+	VGLHWindow *hwnd = glfwGetWin32Window(wnd);
+	int l, t, r, b;
+	if (!vglhGetViewport(&l, &t, &r, &b))
+		return;
+	vglhTextConfig(hwnd, ALIGN_TOP | ALIGN_LEFT, 0x66FFFF);
+	vglhDrawText(hwnd, "View Mode", l, t);
+	if (currentModel != NULL) {
+		model *mod = currentModel;
+		uint cnt = 0;
+		for (uint i = 0; i < mod->componentCount; i++) {
+			cnt += mod->components[i].triangleCount;
+		}
+		vglhTextConfig(hwnd, ALIGN_BOTTOM | ALIGN_LEFT, 0x66FFFF);
+		sprintf(stringBuffer, "Comp.%d, Tex.%d, Tri.%d",
+			mod->componentCount, mod->textureCount, cnt);
+		vglhDrawText(hwnd, stringBuffer, l, b);
+	}
 }
 
 void start(void) {
 	char **args;
 	uint argcnt = initProcess(&args);
 	initData(argcnt, args);
+	vfree((void**)args, argcnt);
 	GLFWwindow* wnd = initGLFW();
 	glfwMakeContextCurrent(wnd);
 	initGraphics();
