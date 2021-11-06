@@ -23,6 +23,39 @@ extern char *stringConvertMultiS(const wchar *wstr);
 extern uint stringACPConvertMultiBuffer(const char *str, int s, char **bufp);
 extern char *stringACPConvertMultiBufferS(const char *str);
 
+typedef float VGLHModelPoint[3];
+typedef float VGLHModelLine[2][3];
+typedef struct {
+	float vertices[3][3];
+	float normals[3][3];
+	float textureBinds[3][2];
+} VGLHModelTriangle;
+
+typedef struct {
+	uint id;
+	ushort width, height;
+	const byte (*pixels)[3];
+} VGLHTexture;
+
+typedef struct {
+	float color[3];
+	float specularColor[3];
+	VGLHTexture *texture;
+	uint pointCount;
+	uint lineCount;
+	uint triangleCount;
+	VGLHModelPoint *points;
+	VGLHModelLine *lines;
+	VGLHModelTriangle *triangles;
+} VGLHComponent;
+
+typedef struct {
+	uint textureCount;
+	VGLHTexture *textures;
+	uint componentCount;
+	VGLHComponent *components;
+} VGLHModel;
+
 typedef void VGLHWindow;
 
 #define ALIGN_TOP 0
@@ -30,6 +63,13 @@ typedef void VGLHWindow;
 #define ALIGN_LEFT 0
 #define ALIGN_CENTER 6
 #define ALIGN_RIGHT 2
+
+extern VGLHTexture *vglhLoadTextureImage(const char *fn, VGLHTexture *tex);
+extern bool vglhCreateTexture(VGLHTexture *tex);
+extern VGLHModel *vglhLoadModel(const char *fn, VGLHModel *mod);
+extern void vglhDrawTriangle(const VGLHModelTriangle *tri);
+extern bool vglhDrawComponent(const VGLHComponent *comp);
+extern bool vglhDrawModel(const VGLHModel *mod);
 
 extern bool vglhGetViewport(int *lp, int *tp, int *rp, int *bp);
 extern bool vglhTextConfig(VGLHWindow *hwnd, uint aln, uint clr);
@@ -56,4 +96,5 @@ extern void *zalloc(uint s);
 extern void vfree(void **ps, uint cnt);
 extern bool uchdir(const char *fp);
 extern IOFile *ufopen(const char *fn, const char *m);
+extern uint ufget(IOFile *f, char **strp);
 extern void messageBox(const char *tt, const char *txt, uint typ);

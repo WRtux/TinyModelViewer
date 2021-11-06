@@ -55,6 +55,23 @@ IOFile *ufopen(const char *fn, const char *m) {
 	return f;
 }
 
+uint ufget(IOFile *f, char **strp) {
+	ushort lim;
+	if (fread(&lim, sizeof(ushort), 1, f) < 1) {
+		*strp = NULL;
+		return 0;
+	}
+	*strp = malloc(lim);
+	if (*strp == NULL)
+		return fseek(f, SEEK_CUR, lim) == 0 ? lim : 0;
+	if (fread(*strp, lim, 1, f) < 1) {
+		free(*strp);
+		*strp = NULL;
+		return 0;
+	}
+	return lim;
+}
+
 void messageBox(const char *txt, const char *tt, uint typ) {
 	wchar *wtt;
 	stringConvertWideBuffer(tt, -1, &wtt);
