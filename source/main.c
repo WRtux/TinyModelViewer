@@ -61,44 +61,57 @@ void initGraphics(void) {
 }
 
 void resize(GLFWwindow *wnd, int w, int h) {
-	int min = (w <= h) ? w : h;
-	double dx = 0.1 / 2 * w / min, dy = 0.1 / 2 * h / min;
 	glViewport(0, 0, w, h);
-	glMatrixMode(GL_PROJECTION);
-	glLoadIdentity();
-	glFrustum(-dx, dx, -dy, dy, 0.075, 1000.0);
 }
 
 void display(GLFWwindow *wnd) {
+	if (glfwWindowShouldClose(wnd))
+		return;
+	int l, t;
+	uint w, h;
+	if (!vglhGetViewport(&l, &t, &w, &h)) {
+		glfwSetWindowShouldClose(wnd, true);
+		messageBox("Context error.", NULL, MESSAGE_ERROR | MESSAGE_MODAL);
+		return;
+	}
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-	glMatrixMode(GL_MODELVIEW);
-	glLoadIdentity();
-	gluLookAt(0.0, 12.0, 20.0, 0.0, 10.0, 0.0, 0.0, 1.0, 0.0);
-	glEnable(GL_LIGHT0);
-	float pos[] = {0.0, 0.0, 10.0, 0.0};
-	glLightfv(GL_LIGHT0, GL_POSITION, pos);
-	glLightfv(GL_LIGHT0, GL_DIFFUSE, directedLight);
-	glLightfv(GL_LIGHT0, GL_SPECULAR, directedLight);
-	glRotated(180.0, 0.0, 1.0, 0.0);
-	vglhDrawModel(currentModel);
+	{
+		glMatrixMode(GL_PROJECTION);
+		glLoadIdentity();
+		uint min = (w <= h) ? w : h;
+		double dx = 0.1 / 2 * w / min, dy = 0.1 / 2 * h / min;
+		glFrustum(-dx, dx, -dy, dy, 0.075, 1000.0);
+	} {
+		glMatrixMode(GL_MODELVIEW);
+		glLoadIdentity();
+		gluLookAt(0.0, 12.0, 20.0, 0.0, 10.0, 0.0, 0.0, 1.0, 0.0);
+		glEnable(GL_LIGHT0);
+		float pos[] = {0.0, 0.0, 10.0, 0.0};
+		glLightfv(GL_LIGHT0, GL_POSITION, pos);
+		glLightfv(GL_LIGHT0, GL_DIFFUSE, directedLight);
+		glLightfv(GL_LIGHT0, GL_SPECULAR, directedLight);
+		glRotated(180.0, 0.0, 1.0, 0.0);
+		vglhDrawModel(currentModel);
+	}
 	glFlush();
 	glfwSwapBuffers(wnd);
-	VGLHWindow *hwnd = glfwGetWin32Window(wnd);
-	int l, t, r, b;
-	if (!vglhGetViewport(&l, &t, &r, &b))
-		return;
-	vglhTextConfig(hwnd, ALIGN_TOP | ALIGN_LEFT, 0x66FFFF);
-	vglhDrawText(hwnd, "View Mode", l, t);
-	if (currentModel != NULL) {
-		VGLHModel *mod = currentModel;
-		uint cnt = 0;
-		for (uint i = 0; i < mod->componentCount; i++) {
-			cnt += mod->components[i].triangleCount;
+	{
+		VGLHWindow *hwnd = glfwGetWin32Window(wnd);
+		vglhTextConfig(hwnd, ALIGN_TOP | ALIGN_LEFT, 0x66FFFF);
+		vglhDrawText(hwnd, "View Mode", l, t);
+		if (currentModel != NULL) {
+			VGLHModel *mod = currentModel;
+			uint cnt = 0;
+			for (uint i = 0; i < mod->componentCount; i++) {
+				cnt += mod->components[i].triangleCount;
+			}
+			vglhTextConfig(hwnd, ALIGN_BOTTOM | ALIGN_LEFT, 0x66FFFF);
+			sprintf(stringBuffer, "Comp.%d, tex.%d, tri.%d",
+				mod->componentCount, mod->textureCount, cnt);
+			vglhDrawText(hwnd, stringBuffer, l, t + h);
+		} else {
+			vglhDrawText(hwnd, "No model", l, t + h);
 		}
-		vglhTextConfig(hwnd, ALIGN_BOTTOM | ALIGN_LEFT, 0x66FFFF);
-		sprintf(stringBuffer, "Comp.%d, Tex.%d, Tri.%d",
-			mod->componentCount, mod->textureCount, cnt);
-		vglhDrawText(hwnd, stringBuffer, l, b);
 	}
 }
 

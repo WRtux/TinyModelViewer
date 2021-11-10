@@ -6,6 +6,8 @@ int __ms_vsnprintf(char *buf, size_t cnt, const char *fmt, va_list argp) {
 	return vsnprintf(buf, cnt, fmt, argp);
 } // Support static linking
 
+const void *const nullish = NULL;
+
 extern void SetProcessDPIAware(void); // Support old Windows header
 uint initProcess(char ***argsp) {
 	if (LOBYTE(GetVersion()) < 0x06) {

@@ -7,16 +7,13 @@ VGLHTexture *vglhLoadTextureImage(const char *fn, VGLHTexture *tex) {
 	if (ntex == NULL)
 		return NULL;
 	GDIPImage *himg = imageLoadFile(fn);
-	if (himg == NULL)
-		goto c0;
+	bcatch(himg != NULL, c0);
 	uint w, h;
-	if (!imageGetSize(himg, &w, &h))
-		goto c0;
+	bcatch(imageGetSize(himg, &w, &h), c0);
 	ntex->width = w;
 	ntex->height = h;
 	ntex->pixels = imageGetPixels(himg, NULL);
-	if (ntex->pixels == NULL)
-		goto c0;
+	bcatch(ntex->pixels != NULL, c0);
 	imageDispose(himg);
 	return ntex;
 c0:	if (himg != NULL)
@@ -50,30 +47,27 @@ VGLHModel *vglhLoadModel(const char *fn, VGLHModel *mod) {
 		return NULL;
 	memset(nmod, 0, sizeof(VGLHModel));
 	IOFile *fp = ufopen(fn, "rb");
-	if (fp == NULL)
-		goto c0;
+	bcatch(fp != NULL, c0);
 	struct {
 		uint header;
 		ushort textureCount;
 		ushort componentCount;
 	} buf;
-	if (fread(&buf, sizeof(buf), 1, fp) < 1 || buf.header != 0x4A424FFF)
-		goto c0;
+	bcatch(fread(&buf, sizeof(buf), 1, fp) == 1, c0);
+	bcatch(buf.header == 0x4A424FFF, c0);
 	nmod->textureCount = buf.textureCount;
 	nmod->textures = zalloc(sizeof(VGLHTexture) * buf.textureCount);
-	if (nmod->textures == NULL)
-		goto c0;
+	bcatch(nmod->textures != NULL, c0)
 	for (ushort i = 0; i < buf.textureCount; i++) {
 		ushort len;
-		if (fread(&len, sizeof(ushort), 1, fp) < 1 || fread(stringBuffer, len, 1, fp) < 1)
-			goto c0;
+		bcatch(fread(&len, sizeof(ushort), 1, fp) == 1, c0);
+		bcatch(fread(stringBuffer, len, 1, fp) == 1, c0);
 		stringBuffer[len] = '\0';
 		vglhLoadTextureImage(stringBuffer, &nmod->textures[i]);
 	}
 	nmod->componentCount = buf.componentCount;
 	nmod->components = zalloc(sizeof(VGLHComponent) * buf.componentCount);
-	if (nmod->components == NULL)
-		goto c0;
+	bcatch(nmod->components != NULL, c0);
 	for (ushort i = 0; i < buf.componentCount; i++) {
 		VGLHComponent *comp = &nmod->components[i];
 		struct {
@@ -82,54 +76,45 @@ VGLHModel *vglhLoadModel(const char *fn, VGLHModel *mod) {
 			ushort textureIndex;
 			ushort counts[3];
 		} buf;
-		if (fread(&buf, sizeof(buf), 1, fp) < 1)
-			goto c0;
-		memcpy(&comp->color, &buf.color, sizeof(float[3]));
+		bcatch(fread(&buf, sizeof(buf), 1, fp) == 1, c0);
+		memcpy(&comp->ambientColor, &buf.color, sizeof(float[3]));
+		memcpy(&comp->diffuseColor, &buf.color, sizeof(float[3])); //TODO
 		memcpy(&comp->specularColor, &buf.specularColor, sizeof(float[3]));
 		if (buf.textureIndex < nmod->textureCount)
 			comp->texture = &nmod->textures[buf.textureIndex];
 		float (*vs)[3] = malloc(sizeof(float[3]) * buf.counts[0]);
 		float (*vns)[3] = malloc(sizeof(float[3]) * buf.counts[1]);
 		float (*vts)[2] = malloc(sizeof(float[2]) * buf.counts[2]);
-		if (vs == NULL || vns == NULL || vts == NULL)
-			goto c1;
+		bcatch(vs != NULL && vns != NULL && vts != NULL, c1);
 		buf.counts[0] -= fread(vs, sizeof(float[3]), buf.counts[0], fp);
 		buf.counts[1] -= fread(vns, sizeof(float[3]), buf.counts[1], fp);
 		buf.counts[2] -= fread(vts, sizeof(float[2]), buf.counts[2], fp);
-		if (buf.counts[0] > 0 || buf.counts[1] > 0 || buf.counts[2] > 0)
-			goto c1;
-		if (fread(&buf.counts, sizeof(ushort[3]), 1, fp) < 1)
-			goto c1;
+		bcatch(buf.counts[0] == 0 && buf.counts[1] == 0 && buf.counts[2] == 0, c1);
+		bcatch(fread(&buf.counts, sizeof(ushort[3]), 1, fp) == 1, c1);
 		comp->pointCount = buf.counts[0];
 		comp->points = malloc(sizeof(VGLHModelPoint) * buf.counts[0]);
-		if (comp->points == NULL)
-			goto c1;
+		bcatch(comp->points != NULL, c1);
 		for (ushort j = 0; j < buf.counts[0]; j++) {
 			ushort i;
-			if (fread(&i, sizeof(ushort), 1, fp) < 1)
-				goto c1;
+			bcatch(fread(&i, sizeof(ushort), 1, fp) == 1, c1);
 			memcpy(&comp->points[i], vs[i], sizeof(float[3]));
 		}
 		comp->lineCount = buf.counts[1];
 		comp->lines = malloc(sizeof(VGLHModelLine) * buf.counts[1]);
-		if (comp->lines == NULL)
-			goto c1;
+		bcatch(comp->lines != NULL, c1);
 		for (ushort j = 0; j < buf.counts[1]; j++) {
 			ushort is[2];
-			if (fread(is, sizeof(ushort[2]), 1, fp) < 1)
-				goto c1;
+			bcatch(fread(is, sizeof(ushort[2]), 1, fp) == 1, c1);
 			memcpy(&comp->lines[i][0], vs[is[0]], sizeof(float[3]));
 			memcpy(&comp->lines[i][1], vs[is[1]], sizeof(float[3]));
 		}
 		comp->triangleCount = buf.counts[2];
 		comp->triangles = malloc(sizeof(VGLHModelTriangle) * buf.counts[2]);
-		if (comp->triangles == NULL)
-			goto c1;
+		bcatch(comp->triangles != NULL, c1);
 		for (ushort j = 0; j < buf.counts[2]; j++) {
 			VGLHModelTriangle *tri = &comp->triangles[j];
 			ushort iss[3][3];
-			if (fread(iss, sizeof(ushort[3][3]), 1, fp) < 1)
-				goto c1;
+			bcatch(fread(iss, sizeof(ushort[3][3]), 1, fp) == 1, c1);
 			for (uchar k = 0; k < 3; k++) {
 				memcpy(tri->vertices[k], vs[iss[0][k]], sizeof(float[3]));
 				memcpy(tri->normals[k], vns[iss[1][k]], sizeof(float[3]));
@@ -186,7 +171,7 @@ bool vglhDrawComponent(const VGLHComponent *comp) {
 	if (comp->triangles == NULL)
 		return false;
 	glGetError();
-	glColor3fv(comp->color);
+	glColor3fv(comp->ambientColor);
 	glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, comp->specularColor);
 	if (comp->texture != NULL)
 		glBindTexture(GL_TEXTURE_2D, comp->texture->id);

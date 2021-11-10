@@ -9,6 +9,9 @@ typedef unsigned long long ulong;
 
 typedef unsigned short wchar;
 
+#define bcatch(exp,lbl); if (!(exp)) goto lbl;
+#define pcatch(p,lbl); if (!*((p) || &nullish)) goto lbl;
+
 extern char stringBuffer[];
 extern wchar wstringBuffer[];
 
@@ -33,12 +36,13 @@ typedef struct {
 
 typedef struct {
 	uint id;
-	ushort width, height;
+	uint width, height;
 	const byte (*pixels)[3];
 } VGLHTexture;
 
 typedef struct {
-	float color[3];
+	float ambientColor[3];
+	float diffuseColor[3];
 	float specularColor[3];
 	VGLHTexture *texture;
 	uint pointCount;
@@ -71,7 +75,7 @@ extern void vglhDrawTriangle(const VGLHModelTriangle *tri);
 extern bool vglhDrawComponent(const VGLHComponent *comp);
 extern bool vglhDrawModel(const VGLHModel *mod);
 
-extern bool vglhGetViewport(int *lp, int *tp, int *rp, int *bp);
+extern bool vglhGetViewport(int *xp, int *yp, uint *wp, uint *hp);
 extern bool vglhTextConfig(VGLHWindow *hwnd, uint aln, uint clr);
 extern bool vglhDrawText(VGLHWindow *hwnd, const char *txt, uint x, uint y);
 
@@ -90,6 +94,8 @@ typedef void IOFile;
 #define MESSAGE_WARNING 0x20
 #define MESSAGE_ERROR 0x10
 #define MESSAGE_MODAL 0x12000
+
+extern const void *const nullish;
 
 extern uint initProcess(char ***argsp);
 extern void *zalloc(uint s);

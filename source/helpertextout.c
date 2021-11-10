@@ -20,22 +20,22 @@ bool vglhInitFont(void) {
 	return interfaceFont != NULL;
 }
 
-bool vglhGetViewport(int *lp, int *tp, int *rp, int *bp) {
-	if (lp == NULL && tp == NULL && rp == NULL && bp == NULL)
+bool vglhGetViewport(int *xp, int *yp, uint *wp, uint *hp) {
+	if (xp == NULL && yp == NULL && wp == NULL && hp == NULL)
 		return false;
 	int buf[4];
 	glGetError();
 	glGetIntegerv(GL_VIEWPORT, buf);
 	if (glGetError() != GL_NO_ERROR)
 		return false;
-	if (lp != NULL)
-		*lp = buf[0];
-	if (tp != NULL)
-		*tp = buf[1];
-	if (rp != NULL)
-		*rp = buf[0] + buf[2];
-	if (bp != NULL)
-		*bp = buf[1] + buf[3];
+	if (xp != NULL)
+		*xp = buf[0];
+	if (yp != NULL)
+		*yp = buf[1];
+	if (wp != NULL)
+		*wp = buf[2];
+	if (hp != NULL)
+		*hp = buf[3];
 	return true;
 }
 
