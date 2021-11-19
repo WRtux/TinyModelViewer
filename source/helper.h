@@ -98,8 +98,6 @@ typedef void IOFile;
 extern const void *const nullish;
 
 extern uint initProcess(char ***argsp);
-extern void *zalloc(uint s);
-extern void vfree(void **ps, uint cnt);
 extern bool uchdir(const char *fp);
 extern IOFile *ufopen(const char *fn, const char *m);
 extern uint ufget(IOFile *f, char **strp);

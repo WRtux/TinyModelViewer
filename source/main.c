@@ -55,8 +55,10 @@ void initGraphics(void) {
 	glShadeModel(GL_SMOOTH);
 	glEnable(GL_RESCALE_NORMAL);
 	glEnable(GL_TEXTURE_2D);
-	for (ushort i = 0; i < currentModel->textureCount; i++) {
-		vglhCreateTexture(&currentModel->textures[i]);
+	if (currentModel != NULL) {
+		for (ushort i = 0; i < currentModel->textureCount; i++) {
+			vglhCreateTexture(&currentModel->textures[i]);
+		}
 	}
 }
 
@@ -91,7 +93,8 @@ void display(GLFWwindow *wnd) {
 		glLightfv(GL_LIGHT0, GL_DIFFUSE, directedLight);
 		glLightfv(GL_LIGHT0, GL_SPECULAR, directedLight);
 		glRotated(180.0, 0.0, 1.0, 0.0);
-		vglhDrawModel(currentModel);
+		if (currentModel != NULL)
+			vglhDrawModel(currentModel);
 	}
 	glFlush();
 	glfwSwapBuffers(wnd);
@@ -99,13 +102,13 @@ void display(GLFWwindow *wnd) {
 		VGLHWindow *hwnd = glfwGetWin32Window(wnd);
 		vglhTextConfig(hwnd, ALIGN_TOP | ALIGN_LEFT, 0x66FFFF);
 		vglhDrawText(hwnd, "View Mode", l, t);
+		vglhTextConfig(hwnd, ALIGN_BOTTOM | ALIGN_LEFT, 0x66FFFF);
 		if (currentModel != NULL) {
 			VGLHModel *mod = currentModel;
 			uint cnt = 0;
 			for (uint i = 0; i < mod->componentCount; i++) {
 				cnt += mod->components[i].triangleCount;
 			}
-			vglhTextConfig(hwnd, ALIGN_BOTTOM | ALIGN_LEFT, 0x66FFFF);
 			sprintf(stringBuffer, "Comp.%d, tex.%d, tri.%d",
 				mod->componentCount, mod->textureCount, cnt);
 			vglhDrawText(hwnd, stringBuffer, l, t + h);
@@ -119,8 +122,11 @@ void start(void) {
 	char **args;
 	uint argcnt = initProcess(&args);
 	initData(argcnt, args);
-	vfree((void**)args, argcnt);
-	GLFWwindow* wnd = initGLFW();
+	for (uint i = 0; i < argcnt; i++) {
+		free(args[0]);
+	}
+	free(args);
+	GLFWwindow *wnd = initGLFW();
 	glfwMakeContextCurrent(wnd);
 	initGraphics();
 	glfwSetFramebufferSizeCallback(wnd, &resize);

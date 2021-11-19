@@ -8,12 +8,15 @@ int __ms_vsnprintf(char *buf, size_t cnt, const char *fmt, va_list argp) {
 
 const void *const nullish = NULL;
 
-extern void SetProcessDPIAware(void); // Support old Windows header
 uint initProcess(char ***argsp) {
-	if (LOBYTE(GetVersion()) < 0x06) {
-		messageBox("Windows outdated.", NULL, MESSAGE_WARNING);
+	if (LOBYTE(GetVersion()) >= 0x06) {
+		HMODULE hmod = LoadLibraryA("user32.dll");
+		if (hmod == NULL)
+			ExitProcess(GetLastError());
+		GetProcAddress(hmod, "SetProcessDPIAware")();
+		FreeLibrary(hmod);
 	} else {
-		SetProcessDPIAware();
+		messageBox("Windows outdated.", NULL, MESSAGE_WARNING);
 	}
 	if (argsp == NULL)
 		return 0;
@@ -28,20 +31,6 @@ uint initProcess(char ***argsp) {
 	}
 	LocalFree(wargs);
 	return cnt;
-}
-
-void *zalloc(uint s) {
-	void *p = malloc(s);
-	if (p == NULL)
-		return NULL;
-	return memset(p, 0, s);
-}
-
-void vfree(void **ps, uint cnt) {
-	for (uint i = 0; i < cnt; i++) {
-		free(ps[i]);
-	}
-	free(ps);
 }
 
 bool uchdir(const char *fp) {

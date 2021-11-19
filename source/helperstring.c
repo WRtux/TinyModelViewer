@@ -106,7 +106,7 @@ uint stringACPConvertMultiBuffer(const char *str, int s, char **bufp) {
 			*bufp = NULL;
 		return 0;
 	}
-	int len = MultiByteToWideChar(CP_THREAD_ACP, 0, str, s, wstringBuffer, WSTRING_BUFFER_LENGTH);
+	int len = MultiByteToWideChar(CP_ACP, 0, str, s, wstringBuffer, WSTRING_BUFFER_LENGTH);
 	if (len > 0)
 		len = WideCharToMultiByte(CP_UTF8, 0, wstringBuffer, len, stringBuffer, STRING_BUFFER_SIZE, NULL, NULL);
 	if (s > 0 && len < STRING_BUFFER_SIZE || s == -1 && len == 0)
@@ -124,7 +124,7 @@ uint stringACPConvertMultiBuffer(const char *str, int s, char **bufp) {
 char *stringACPConvertMultiBufferS(const char *str) {
 	if (str == NULL)
 		return NULL;
-	int len = MultiByteToWideChar(CP_THREAD_ACP, 0, str, -1, wstringBuffer, WSTRING_BUFFER_LENGTH);
+	int len = MultiByteToWideChar(CP_ACP, 0, str, -1, wstringBuffer, WSTRING_BUFFER_LENGTH);
 	if (len > 0)
 		len = WideCharToMultiByte(CP_UTF8, 0, wstringBuffer, len, stringBuffer, STRING_BUFFER_SIZE, NULL, NULL);
 	return len > 0 ? stringBuffer : NULL;

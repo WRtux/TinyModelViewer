@@ -56,7 +56,7 @@ VGLHModel *vglhLoadModel(const char *fn, VGLHModel *mod) {
 	bcatch(fread(&buf, sizeof(buf), 1, fp) == 1, c0);
 	bcatch(buf.header == 0x4A424FFF, c0);
 	nmod->textureCount = buf.textureCount;
-	nmod->textures = zalloc(sizeof(VGLHTexture) * buf.textureCount);
+	nmod->textures = calloc(buf.textureCount, sizeof(VGLHTexture));
 	bcatch(nmod->textures != NULL, c0)
 	for (ushort i = 0; i < buf.textureCount; i++) {
 		ushort len;
@@ -66,7 +66,7 @@ VGLHModel *vglhLoadModel(const char *fn, VGLHModel *mod) {
 		vglhLoadTextureImage(stringBuffer, &nmod->textures[i]);
 	}
 	nmod->componentCount = buf.componentCount;
-	nmod->components = zalloc(sizeof(VGLHComponent) * buf.componentCount);
+	nmod->components = calloc(buf.componentCount, sizeof(VGLHComponent));
 	bcatch(nmod->components != NULL, c0);
 	for (ushort i = 0; i < buf.componentCount; i++) {
 		VGLHComponent *comp = &nmod->components[i];
