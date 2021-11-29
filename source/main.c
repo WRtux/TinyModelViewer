@@ -5,14 +5,24 @@
 #include <GL/glu.h>
 #include <GL/glfw3.h>
 
-// Replace native to avoid including Windows header
+// Replace glfw3native to avoid including Windows header
 extern VGLHWindow *glfwGetWin32Window(GLFWwindow* wnd);
 extern void *glfwGetWGLContext(GLFWwindow* wnd);
+
+float cameraPosition[3] = {0.0, 10.0, 25.0};
+float cameraOrientation[2] = {0.0, -5.0};
 
 const float ambientLight[] = {0.2, 0.2, 0.2, 1.0};
 const float directedLight[] = {0.8, 0.8, 0.8, 1.0};
 
-VGLHModel *currentModel;
+VGLHModel *currentModel = NULL;
+
+float transformMatrix[4][4];
+
+byte interactMode = ' ';
+
+byte dragMode = ' ';
+float dragDistance = 0.0;
 
 void initData(uint argcnt, char **args) {
 	if (!imageInit()) {
@@ -55,11 +65,15 @@ void initGraphics(void) {
 	glShadeModel(GL_SMOOTH);
 	glEnable(GL_RESCALE_NORMAL);
 	glEnable(GL_TEXTURE_2D);
+	glMatrixMode(GL_MODELVIEW);
+	glLoadIdentity();
+	glGetFloatv(GL_MODELVIEW_MATRIX, (float*)transformMatrix);
 	if (currentModel != NULL) {
-		for (ushort i = 0; i < currentModel->textureCount; i++) {
+		for (uint i = 0; i < currentModel->textureCount; i++) {
 			vglhCreateTexture(&currentModel->textures[i]);
 		}
 	}
+	interactMode = 'V';
 }
 
 void resize(GLFWwindow *wnd, int w, int h) {
@@ -86,22 +100,30 @@ void display(GLFWwindow *wnd) {
 	} {
 		glMatrixMode(GL_MODELVIEW);
 		glLoadIdentity();
-		gluLookAt(0.0, 12.0, 20.0, 0.0, 10.0, 0.0, 0.0, 1.0, 0.0);
+		glRotatef(-cameraOrientation[1], 1.0, 0.0, 0.0);
+		glRotatef(-cameraOrientation[0], 0.0, 1.0, 0.0);
+		glTranslatef(-cameraPosition[0], -cameraPosition[1], -cameraPosition[2]);
 		glEnable(GL_LIGHT0);
 		float pos[] = {0.0, 0.0, 10.0, 0.0};
 		glLightfv(GL_LIGHT0, GL_POSITION, pos);
 		glLightfv(GL_LIGHT0, GL_DIFFUSE, directedLight);
 		glLightfv(GL_LIGHT0, GL_SPECULAR, directedLight);
-		glRotated(180.0, 0.0, 1.0, 0.0);
+	} {
+		glPushMatrix();
+		glMultMatrixf((float*)transformMatrix);
 		if (currentModel != NULL)
 			vglhDrawModel(currentModel);
+		glPopMatrix();
 	}
 	glFlush();
 	glfwSwapBuffers(wnd);
 	{
 		VGLHWindow *hwnd = glfwGetWin32Window(wnd);
 		vglhTextConfig(hwnd, ALIGN_TOP | ALIGN_LEFT, 0x66FFFF);
-		vglhDrawText(hwnd, "View Mode", l, t);
+		char *tt = (interactMode == 'V' ? "View Mode" :
+			interactMode == 'F' ? "Free Control Mode" :
+			interactMode == 'E' ? "Component Edit Mode" : "Unknown Mode");
+		vglhDrawText(hwnd, tt, l, t);
 		vglhTextConfig(hwnd, ALIGN_BOTTOM | ALIGN_LEFT, 0x66FFFF);
 		if (currentModel != NULL) {
 			VGLHModel *mod = currentModel;
@@ -118,12 +140,227 @@ void display(GLFWwindow *wnd) {
 	}
 }
 
+void inputKey(GLFWwindow *wnd, int k, int id, int st, int m) {
+	if (st == GLFW_PRESS || st == GLFW_REPEAT) {
+		switch (interactMode) {
+		case 'V':
+		case 'F':
+		case 'E': {
+			bool f = false;
+			float d[] = {0.0, 0.0, 0.0};
+			switch (k) {
+			case GLFW_KEY_A:
+				f = true;
+				d[0] = -1.0;
+				break;
+			case GLFW_KEY_D:
+				f = true;
+				d[0] = 1.0;
+				break;
+			case GLFW_KEY_W:
+				f = true;
+				d[2] = -1.0;
+				break;
+			case GLFW_KEY_S:
+				f = true;
+				d[2] = 1.0;
+				break;
+			case GLFW_KEY_Q:
+				f = true;
+				d[1] = 1.0;
+				break;
+			case GLFW_KEY_E:
+				f = true;
+				d[1] = -1.0;
+				break;
+			}
+			if (f) {
+				glMatrixMode(GL_MODELVIEW);
+				glPushMatrix();
+				glLoadIdentity();
+				glRotatef(cameraOrientation[0], 0.0, 1.0, 0.0);
+				if (interactMode != 'F')
+					glRotatef(cameraOrientation[1], 1.0, 0.0, 0.0);
+				float buf[4][4] = {{d[0], d[1], d[2], 1.0}};
+				glMultMatrixf((float*)buf);
+				glGetFloatv(GL_MODELVIEW_MATRIX, (float*)buf);
+				cameraPosition[0] += buf[0][0];
+				cameraPosition[1] += buf[0][1];
+				cameraPosition[2] += buf[0][2];
+				glPopMatrix();
+				display(wnd);
+			}
+			break;
+		}
+		}
+	}
+}
+
+void inputClick(GLFWwindow *wnd, int butn, int st, int m) {
+	if (st == GLFW_RELEASE && dragDistance < 4.0) {
+		switch (interactMode) {
+		case 'V':
+			switch (butn) {
+			case GLFW_MOUSE_BUTTON_LEFT:
+				interactMode = 'F';
+				glfwSetInputMode(wnd, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+				display(wnd);
+				break;
+			case GLFW_MOUSE_BUTTON_RIGHT:
+			case GLFW_MOUSE_BUTTON_MIDDLE:
+				interactMode = 'E';
+				display(wnd);
+				break;
+			}
+			break;
+		case 'F':
+			switch (butn) {
+			case GLFW_MOUSE_BUTTON_LEFT:
+				interactMode = 'V';
+				glfwSetInputMode(wnd, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+				display(wnd);
+				break;
+			case GLFW_MOUSE_BUTTON_MIDDLE:
+				interactMode = 'E';
+				glfwSetInputMode(wnd, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+				display(wnd);
+				break;
+			}
+			break;
+		case 'E':
+			switch (butn) {
+			case GLFW_MOUSE_BUTTON_MIDDLE:
+				interactMode = 'V';
+				display(wnd);
+				break;
+			}
+			break;
+		}
+	}
+	if (st == GLFW_PRESS) {
+		if (dragMode == ' ') {
+			dragMode = (butn == GLFW_MOUSE_BUTTON_LEFT ? 'L' :
+				butn == GLFW_MOUSE_BUTTON_RIGHT ? 'R' :
+				butn == GLFW_MOUSE_BUTTON_MIDDLE ? 'M' : 'U');
+			dragDistance = 0.0;
+		} else {
+			dragMode = 'X';
+		}
+	} else if (st == GLFW_RELEASE) {
+		dragMode = ' ';
+		dragDistance = 0.0;
+	}
+}
+
+void inputMove(GLFWwindow *wnd, double x, double y) {
+	static double lx, ly;
+	double dx = x - lx, dy = y - ly;
+	dragDistance += (dx >= 0.0 ? dx : -dx) + (dy >= 0.0 ? dy : -dy);
+	switch (interactMode) {
+	case 'V':
+		if (dragMode == 'L') {
+			cameraOrientation[0] -= dx * 180 / 1000;
+			cameraOrientation[1] -= dy * 180 / 1000;
+			display(wnd);
+		} else if (dragMode == 'R') {
+			glMatrixMode(GL_MODELVIEW);
+			glPushMatrix();
+			glLoadIdentity();
+			glRotatef(cameraOrientation[0], 0.0, 1.0, 0.0);
+			glRotatef(cameraOrientation[1], 1.0, 0.0, 0.0);
+			float buf[4][4] = {{-dx / 50, dy / 50, 0.0, 1.0}};
+			glMultMatrixf((float*)buf);
+			glGetFloatv(GL_MODELVIEW_MATRIX, (float*)buf);
+			cameraPosition[0] += buf[0][0];
+			cameraPosition[1] += buf[0][1];
+			cameraPosition[2] += buf[0][2];
+			glPopMatrix();
+			display(wnd);
+		}
+		break;
+	case 'F':
+		cameraOrientation[0] -= dx * 180 / 1000;
+		cameraOrientation[1] -= dy * 180 / 1000;
+		display(wnd);
+		break;
+	case 'E':
+		if (dragMode == 'L') { //TODO
+			glMatrixMode(GL_MODELVIEW);
+			glPushMatrix();
+			glLoadIdentity();
+			glRotatef(cameraOrientation[0], 0.0, 1.0, 0.0);
+			glRotatef(cameraOrientation[1], 1.0, 0.0, 0.0);
+			float buf[4][4] = {{dx / 50, -dy / 50, 0.0, 1.0}};
+			glMultMatrixf((float*)buf);
+			glGetFloatv(GL_MODELVIEW_MATRIX, (float*)buf);
+			glLoadIdentity();
+			glTranslatef(buf[0][0], buf[0][1], buf[0][2]);
+			glMultMatrixf((float*)transformMatrix);
+			glGetFloatv(GL_MODELVIEW_MATRIX, (float*)transformMatrix);
+			glPopMatrix();
+			display(wnd);
+		}
+		break;
+	}
+	lx = x, ly = y;
+}
+
+void inputScroll(GLFWwindow *wnd, double dx, double dy) {
+	dragDistance += (dx >= 0.0 ? dx : -dx) + (dy >= 0.0 ? dy : -dy);
+	switch (interactMode) {
+	case 'V':
+	case 'F': {
+		glMatrixMode(GL_MODELVIEW);
+		glPushMatrix();
+		glLoadIdentity();
+		glRotatef(cameraOrientation[0], 0.0, 1.0, 0.0);
+		glRotatef(cameraOrientation[1], 1.0, 0.0, 0.0);
+		float buf[4][4] = {{-dx, 0.0, -dy, 1.0}};
+		glMultMatrixf((float*)buf);
+		glGetFloatv(GL_MODELVIEW_MATRIX, (float*)buf);
+		cameraPosition[0] += buf[0][0];
+		cameraPosition[1] += buf[0][1];
+		cameraPosition[2] += buf[0][2];
+		glPopMatrix();
+		display(wnd);
+		break;
+	} case 'E':
+		if (dragMode == ' ' || dragMode == 'R') {
+			glMatrixMode(GL_MODELVIEW);
+			glPushMatrix();
+			glLoadIdentity();
+			float s = 1.0 + (dx + dy) * 0.05;
+			glScalef(s, s, s);
+			glMultMatrixf((float*)transformMatrix);
+			glGetFloatv(GL_MODELVIEW_MATRIX, (float*)transformMatrix);
+			glPopMatrix();
+			display(wnd);
+			break;
+		} else if (dragMode == 'L') {
+			glMatrixMode(GL_MODELVIEW);
+			glPushMatrix();
+			glLoadIdentity();
+			glRotatef(cameraOrientation[0], 0.0, 1.0, 0.0);
+			glRotatef(cameraOrientation[1], 1.0, 0.0, 0.0);
+			float buf[4][4] = {{dx, 0.0, dy, 1.0}};
+			glMultMatrixf((float*)buf);
+			glGetFloatv(GL_MODELVIEW_MATRIX, (float*)buf);
+			glLoadIdentity();
+			glTranslatef(buf[0][0], buf[0][1], buf[0][2]);
+			glMultMatrixf((float*)transformMatrix);
+			glGetFloatv(GL_MODELVIEW_MATRIX, (float*)transformMatrix);
+			glPopMatrix();
+			display(wnd);
+		}
+	}
+}
+
 void start(void) {
 	char **args;
 	uint argcnt = initProcess(&args);
 	initData(argcnt, args);
 	for (uint i = 0; i < argcnt; i++) {
-		free(args[0]);
+		free(args[i]);
 	}
 	free(args);
 	GLFWwindow *wnd = initGLFW();
@@ -131,6 +368,10 @@ void start(void) {
 	initGraphics();
 	glfwSetFramebufferSizeCallback(wnd, &resize);
 	glfwSetWindowRefreshCallback(wnd, &display);
+	glfwSetKeyCallback(wnd, &inputKey);
+	glfwSetMouseButtonCallback(wnd, &inputClick);
+	glfwSetCursorPosCallback(wnd, &inputMove);
+	glfwSetScrollCallback(wnd, &inputScroll);
 	while (!glfwWindowShouldClose(wnd)) {
 		glfwWaitEvents();
 	}
