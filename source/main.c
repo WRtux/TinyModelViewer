@@ -15,6 +15,8 @@ float cameraOrientation[2] = {0.0, -5.0};
 const float ambientLight[] = {0.2, 0.2, 0.2, 1.0};
 const float directedLight[] = {0.8, 0.8, 0.8, 1.0};
 
+float lightPosition[4] = {0.0, 20.0, 20.0, 1.0};
+
 VGLHModel *currentModel = NULL;
 
 float transformMatrix[4][4];
@@ -104,11 +106,30 @@ void display(GLFWwindow *wnd) {
 		glRotatef(-cameraOrientation[0], 0.0, 1.0, 0.0);
 		glTranslatef(-cameraPosition[0], -cameraPosition[1], -cameraPosition[2]);
 		glEnable(GL_LIGHT0);
-		float pos[] = {0.0, 0.0, 10.0, 0.0};
-		glLightfv(GL_LIGHT0, GL_POSITION, pos);
+		glLightfv(GL_LIGHT0, GL_POSITION, lightPosition);
 		glLightfv(GL_LIGHT0, GL_DIFFUSE, directedLight);
 		glLightfv(GL_LIGHT0, GL_SPECULAR, directedLight);
 	} {
+		glBindTexture(GL_TEXTURE_2D, 0);
+		glColor3f(0.4, 0.4, 0.4);
+		glBegin(GL_QUADS);
+			glNormal3f(0.0, 1.0, 0.0);
+			glVertex3f(-10.0, -0.1, -10.0);
+			glVertex3f(10.0, -0.1, -10.0);
+			glVertex3f(10.0, -0.1, 10.0);
+			glVertex3f(-10.0, -0.1, 10.0);
+		glEnd();
+		glBegin(GL_LINES);
+			glColor3f(1.0, 0.2, 0.2);
+			glVertex3f(0.0, 0.0, 0.0);
+			glVertex3f(10.0, 0.0, 0.0);
+			glColor3f(0.2, 1.0, 0.2);
+			glVertex3f(0.0, -0.1, 0.0);
+			glVertex3f(0.0, 20.0, 0.0);
+			glColor3f(0.2, 0.2, 1.0);
+			glVertex3f(0.0, 0.0, 0.0);
+			glVertex3f(0.0, 0.0, 10.0);
+		glEnd();
 		glPushMatrix();
 		glMultMatrixf((float*)transformMatrix);
 		if (currentModel != NULL)
@@ -184,14 +205,28 @@ void inputKey(GLFWwindow *wnd, int k, int id, int st, int m) {
 				float buf[4][4] = {{d[0], d[1], d[2], 1.0}};
 				glMultMatrixf((float*)buf);
 				glGetFloatv(GL_MODELVIEW_MATRIX, (float*)buf);
-				cameraPosition[0] += buf[0][0];
-				cameraPosition[1] += buf[0][1];
-				cameraPosition[2] += buf[0][2];
+				for (uint i = 0; i < 3; i++) {
+					cameraPosition[i] += buf[0][i];
+				}
 				glPopMatrix();
 				display(wnd);
 			}
 			break;
 		}
+		}
+	}
+	if (st == GLFW_PRESS) {
+		if (interactMode == 'V' || interactMode == 'F') {
+			switch (k) {
+			case GLFW_KEY_L:
+				lightPosition[3] = (lightPosition[3] < 0.8 ? 1.0 : 0.0);
+			case GLFW_KEY_F:
+				for (uint i = 0; i < 3; i++) {
+					lightPosition[i] = cameraPosition[i];
+				}
+				display(wnd);
+				break;
+			}
 		}
 	}
 }
@@ -258,11 +293,14 @@ void inputMove(GLFWwindow *wnd, double x, double y) {
 	dragDistance += (dx >= 0.0 ? dx : -dx) + (dy >= 0.0 ? dy : -dy);
 	switch (interactMode) {
 	case 'V':
-		if (dragMode == 'L') {
+		switch (dragMode) {
+		case 'L':
 			cameraOrientation[0] -= dx * 180 / 1000;
 			cameraOrientation[1] -= dy * 180 / 1000;
+			cameraOrientation[1] = min(max(cameraOrientation[1], -90.0), 90.0);
 			display(wnd);
-		} else if (dragMode == 'R') {
+			break;
+		case 'R': {
 			glMatrixMode(GL_MODELVIEW);
 			glPushMatrix();
 			glLoadIdentity();
@@ -271,20 +309,24 @@ void inputMove(GLFWwindow *wnd, double x, double y) {
 			float buf[4][4] = {{-dx / 50, dy / 50, 0.0, 1.0}};
 			glMultMatrixf((float*)buf);
 			glGetFloatv(GL_MODELVIEW_MATRIX, (float*)buf);
-			cameraPosition[0] += buf[0][0];
-			cameraPosition[1] += buf[0][1];
-			cameraPosition[2] += buf[0][2];
+			for (uint i = 0; i < 3; i++) {
+				cameraPosition[i] += buf[0][i];
+			}
 			glPopMatrix();
 			display(wnd);
+			break;
+		}
 		}
 		break;
 	case 'F':
 		cameraOrientation[0] -= dx * 180 / 1000;
 		cameraOrientation[1] -= dy * 180 / 1000;
+		cameraOrientation[1] = min(max(cameraOrientation[1], -90.0), 90.0);
 		display(wnd);
 		break;
 	case 'E':
-		if (dragMode == 'L') { //TODO
+		switch (dragMode) {
+		case 'L': {
 			glMatrixMode(GL_MODELVIEW);
 			glPushMatrix();
 			glLoadIdentity();
@@ -299,6 +341,16 @@ void inputMove(GLFWwindow *wnd, double x, double y) {
 			glGetFloatv(GL_MODELVIEW_MATRIX, (float*)transformMatrix);
 			glPopMatrix();
 			display(wnd);
+			break;
+		} case 'R':
+			glMatrixMode(GL_MODELVIEW);
+			glPushMatrix();
+			glLoadMatrixf((float*)transformMatrix);
+			glRotatef(dx * 180 / 1000, 0.0, 1.0, 0.0);
+			glGetFloatv(GL_MODELVIEW_MATRIX, (float*)transformMatrix);
+			glPopMatrix();
+			display(wnd);
+			break;
 		}
 		break;
 	}
@@ -325,18 +377,18 @@ void inputScroll(GLFWwindow *wnd, double dx, double dy) {
 		display(wnd);
 		break;
 	} case 'E':
-		if (dragMode == ' ' || dragMode == 'R') {
+		switch (dragMode) {
+		case ' ': {
 			glMatrixMode(GL_MODELVIEW);
 			glPushMatrix();
-			glLoadIdentity();
+			glLoadMatrixf((float*)transformMatrix);
 			float s = 1.0 + (dx + dy) * 0.05;
 			glScalef(s, s, s);
-			glMultMatrixf((float*)transformMatrix);
 			glGetFloatv(GL_MODELVIEW_MATRIX, (float*)transformMatrix);
 			glPopMatrix();
 			display(wnd);
 			break;
-		} else if (dragMode == 'L') {
+		} case 'L': {
 			glMatrixMode(GL_MODELVIEW);
 			glPushMatrix();
 			glLoadIdentity();
@@ -351,7 +403,19 @@ void inputScroll(GLFWwindow *wnd, double dx, double dy) {
 			glGetFloatv(GL_MODELVIEW_MATRIX, (float*)transformMatrix);
 			glPopMatrix();
 			display(wnd);
+			break;
+		} case 'R':
+			glMatrixMode(GL_MODELVIEW);
+			glPushMatrix();
+			glLoadMatrixf((float*)transformMatrix);
+			glRotatef(-dy * 7.5, 1.0, 0.0, 0.0);
+			glRotatef(dx * 7.5, 0.0, 0.0, 1.0);
+			glGetFloatv(GL_MODELVIEW_MATRIX, (float*)transformMatrix);
+			glPopMatrix();
+			display(wnd);
+			break;
 		}
+		break;
 	}
 }
 
