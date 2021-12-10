@@ -9,8 +9,8 @@ typedef unsigned long long ulong;
 
 typedef unsigned short wchar;
 
-#define bcatch(exp,lbl); if (!(exp)) goto lbl;
-#define pcatch(p,lbl); if (!*((p) || &nullish)) goto lbl;
+#define bcatch(exp,lbl) { if (!(exp)) goto lbl; }
+#define pcatch(p,lbl) { if (!*((p) || &nullish)) goto lbl; }
 
 extern char stringBuffer[];
 extern wchar wstringBuffer[];
@@ -98,7 +98,6 @@ typedef void IOFile;
 extern const void *const nullish;
 
 extern uint initProcess(char ***argsp);
-extern bool uchdir(const char *fp);
 extern IOFile *ufopen(const char *fn, const char *m);
 extern uint ufget(IOFile *f, char **strp);
 extern void messageBox(const char *tt, const char *txt, uint typ);

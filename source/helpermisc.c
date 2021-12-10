@@ -33,10 +33,6 @@ uint initProcess(char ***argsp) {
 	return cnt;
 }
 
-bool uchdir(const char *fp) {
-	return SetCurrentDirectoryW(stringConvertWideBufferS(fp));
-}
-
 IOFile *ufopen(const char *fn, const char *m) {
 	wchar *wm;
 	stringConvertWideBuffer(m, -1, &wm);

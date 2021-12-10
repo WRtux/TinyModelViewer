@@ -31,8 +31,7 @@ void initData(uint argcnt, char **args) {
 		messageBox("GDI+ error.", NULL, MESSAGE_ERROR);
 		abort();
 	}
-	uchdir(argcnt == 2 ? args[1] : "model/");
-	currentModel = vglhLoadModel("model.dat", NULL);
+	currentModel = vglhLoadModel(argcnt == 2 ? args[1] : "model.dat", NULL);
 	imageTerminate();
 }
 

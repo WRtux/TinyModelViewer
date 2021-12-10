@@ -23,8 +23,10 @@ if test -a build/build-new.exe; then
  tput setaf 2
  echo "Build complete. Running..."
  tput setaf 7
- ./build/build.exe
+ pushd build/ >/dev/null
+ ./build.exe
  result=$?
+ popd >/dev/null
  echo
  if test $result -ne 0; then
   tput setaf 3
